@@ -1,0 +1,97 @@
+LANGKAH LANGKAH UNTUK MENGGUNAKAN YOLO
+Pengertian
+(YOLO) adalah sistem deteksi objek real-time yang canggih. Pada Pascal Titan X memproses gambar pada 30 FPS dan memiliki peta 57,9% pada pengujian COCO-dev.
+YOLOv3 sangat cepat dan akurat. Dalam mAP yang diukur pada 0,5 IOU YOLOv3 setara dengan Focal Loss tetapi sekitar 4x lebih cepat. Selain itu, Anda dapat dengan mudah menukar antara kecepatan dan akurasi hanya dengan mengubah ukuran model, tidak perlu pelatihan ulang!
+Berikut adalah langkah-langkah untuk menggunakan YOLO untuk deteksi objek kendaraan (motor) dengan menggunakan OpenCV dan Python.
+1. Unduh Kode Sumber YOLO:
+Kunjungi repositori YOLO di GitHub: https://github.com/AlexeyAB/darknet
+Klik tombol "Code" dan pilih opsi "Download ZIP" untuk mengunduh kode sumber YOLO.
+Ekstrak file ZIP ke direktori yang diinginkan.
+
+2. Unduh File Bobot (Weights), Konfigurasi, dan Label:
+Pilih model YOLO yang ingin Anda gunakan (misalnya, YOLOv3).
+Unduh file bobot (yolov3.weights), file konfigurasi (yolov3.cfg), dan file label (coco.names) dari situs web YOLO atau sumber lainnya.
+
+3. Persiapkan Kode Python untuk Deteksi:
+Buka editor teks atau lingkungan pengembangan Python, dan buat file Python baru (misalnya, detect_motor.py).
+Buat Kode Python untuk Deteksi:
+Gunakan kode Python berikut sebagai titik awal. Ganti path file bobot, konfigurasi, dan label sesuai dengan yang Anda unduh.
+import cv2
+import numpy as np
+
+# Load pre-trained YOLO model
+net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
+classes = []
+with open("coco.names", "r") as f:
+    classes = [line.strip() for line in f.readlines()]
+
+layer_names = net.getUnconnectedOutLayersNames()
+
+# Open webcam (change 0 to the appropriate camera index if you have multiple cameras)
+cap = cv2.VideoCapture(0)
+
+# Counter for detected motorcycles
+motorbike_count = 0
+
+while True:
+    ret, frame = cap.read()
+    height, width, _ = frame.shape
+
+    # Detect objects
+    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outs = net.forward(layer_names)
+
+    # Reset motorcycle count for each frame
+    motorbike_count = 0
+
+    # Get confidence and class predictions
+    for out in outs:
+        for detection in out:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+
+            # Adjust class label for motorcycle detection
+            if confidence > 0.5 and classes[class_id] == "motorbike":
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+
+                # Draw bounding box
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                # Display class label and confidence
+                label = f"{classes[class_id]}: {confidence:.2f}"
+                cv2.putText(frame, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                # Increment motorcycle count
+                motorbike_count += 1
+
+    # Display motorcycle count
+    cv2.putText(frame, f"Motorbikes: {motorbike_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # Draw a box on the frame (you can customize the box position and size)
+    cv2.rectangle(frame, (100, 100), (300, 300), (255, 0, 0), 2)
+
+    # Check if any motorcycle is within the box
+    if motorbike_count > 0 and (
+        (x + w > 100 and x < 300) and (y + h > 100 and y < 300)
+    ):
+        cv2.putText(frame, "Motorcycle in Box!", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+    # Display the result
+    cv2.imshow("Motorcycle Detection", frame)
+
+    # Break the loop when 'q' key is pressed
+    if cv2.waitKey(1) & 0xFF == ord('a'):
+        break
+
+# Release the capture object and close the window
+cap.release()
+cv2.destroyAllWindows()
+
